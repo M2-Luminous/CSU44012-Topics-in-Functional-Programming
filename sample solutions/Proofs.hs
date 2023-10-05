@@ -1,0 +1,155 @@
+
+-- I'm using Dikstra style commented proofs here, but the point is
+-- just to do something convincing. I have done more detailed proofs
+-- of the (easier!) first two properties and just sketched the
+-- approach for the harder associativity law.
+
+-- For brevity I will use the standard [list] syntax instead 
+-- of the Cons/Nil syntax.
+
+-- Proofs (1) and (2) are much more than sketches, but proof (3) gets quite long and so I have only
+-- given a high level sketch of the aproach. You might think this is cheating, but the question did
+-- only ask for a sketch!
+
+
+-- (1) return x >>= f   ===  f x
+--     
+-- return x >>= f 
+-- ==> {definition of return}
+-- [x] >>= f
+-- ==> {definition of bind; using "concat" here for lists not concatL}
+-- concat ( f a : fmap f [] )
+-- ==> definitions of fmap and (:)
+-- concat [f a]
+-- ==> definition of concat
+-- f a ++ []
+-- ==> definition of ++ (or <> as I called it above)
+-- f a
+-- Q.E.D.
+
+
+-- (2) m >>= return    ===     m
+-- 
+-- m >>= return
+-- ==> {definition of >>=}
+-- concat (fmap return m)
+-- ==> {definition of fmap. 2 cases }
+-- Case 1, m is []
+-- ==> by definition of fmap
+--  concat []
+-- ==> Definition of concat 
+--  [] 
+-- ==> since m is [], by definition in the case
+--  (QED)
+-- -- case 2, m is (x:xs)
+-- ==> {by definition of fmap}
+-- concat ( return x : fmap return xs )
+-- ==> {by definition of return}
+-- concat ( [x] : fmap return xs )
+-- ==> { definition of concat }
+-- [x] ++ concat (fmap return xs)
+-- ==> { sketching the proof, definition of fmap... (if I was being very formal I might go for an induction here)}
+-- [x] ++ concat [return xs1, return xs2, return xs3 ... ]
+-- ==> { definition of return }
+-- [x] ++ concat [ [xs1], [xs2], ... ]
+-- ==> { definition of concat }
+-- [x] ++ [xs1] ++ [xs2] ...
+-- ==> { definition of ++ }
+-- [x, xs1, xs2 ..]
+-- ==> { since m is [x, xs1, ...] per case 2 }
+
+-- QED
+
+
+
+- (3) (m >>= f) >>= g   ===   m >>= (\x -> f x >>= g)
+-- Proving associativity is a bit trickier. The standard technique
+-- is to use induction over the list, but the proof is quite long.
+-- Luckily we were only asked for a sketch proof that would be
+-- intuitively convincing.
+-- So here goes:
+--
+-- (a) Prove for m == [] (this is easy)
+-- (b) Now assume this holds for m == as
+-- (c) Under this hypothesis, prove it holds for a:as. Use (++)
+--     in the induction step to split the list in two
+--
+--    assuming (as >>= f) >>= g  === as >>= (\x -> f x >>= g) 
+--    show     (a:as >>= f) >>= g   ===  a:as >>= (\x -> f x >>= g)
+--  (a:as >>= f) >>= g   ===  a:as >>= (\x -> f x >>= g)
+-- { we can expand the definitions of >>= and fmap to arrive at }
+--      === a:as >>= concat . map g . f
+
+--  === concat (fmap (\x -> f x >>= g) a:as)
+--  (a:as >>= f) >>= g   ===  concat (fmap (\x -> f x >>= g) a:as)
+--  (a:as >>= f) >>= g   ===  concat ((\x -> f x >>= g) a) (fmap (\x -> f x >>= g) as)
+--  (a:as >>= f) >>= g   ===  concat (f a >>= g) (fmap (\x -> f x >>= g) as)
+--  (a:as >>= f) >>= g   ===  (f a >>= g) ++ concat (fmap (\x -> f x >>= g) as)
+
+
+--    
+-- This is a bit involved, and I'm now going to wave my hands vigorously
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--For a more comprehensive proof, by different means, we turn to this result
+--Via Johan GLimming originally of Kth >> Cambridge >> Fybctir AV || Uppsala:
+--
+--
+--  (p >>= q) >>= r = p >>= (\x -> q x >>= r)
+--This is established by induction or fusion. For an inductive proof, we can first prove the statement for p=[] (the empty list), and then assume that the statement holds for p=as. Under that hypothesis, we then prove that the statement also holds for p=a:as for any a. An alternative way to prove this is to use the map-concat laws in the textbook, or to use fusion several times. We will now show that the algebraic approach can be make things much easier. We consider two approaches to proving the law.
+--Approach 1: induction
+--
+--We proceed by induction. Let q and r be arbitrary functions of the appropriate type. The basis is that p=[] (recall that the List monad is just a list datatype and a way of sequencing certain list functions):
+--
+--    ([] >>= q) >>= r
+--  = concat (map g []) >>= r
+--  = [] >>= r
+--  = concat (map r []) 
+--  = []
+--On the other hand we have for the right hand side:
+--    p >>= (\x -> q x >>= r) 
+--  = concat (map (\x -> q x >>= r) [])
+--  = []
+--So the two sides of the equation are equal at least for the empty list, i.e. we have a basis for induction. The induction hypothesis is that the statement holds for p=xs and we proceed to prove that it also holds for p=x:xs. Although it is very much possible to complete the proof in this way (in particular using ++ in the induction step to split the list into two parts, before the hypothesis is applied), there is also another approach that highlights and "reuses" previously known algebraic properties.
+--Approach 2: program algebra
+--
+--The definition of >>= is a composition of concat and map, so we can expect the following laws (each proved using induction or fusion) to be useful in the proof of the associativity of the list monad:
+--   map f . concat = concat . map (map f)
+--   concat . concat = concat . map concat
+--Essentially, the associativity expressed by this monad law in this case amounts to shuffling around the concat and map. For this reason, we now try to prove the law using no induction, just the previously established laws from Bird's textbook:
+--    (xs >>= q) >>= r
+--  = concat (map q xs) >>= r
+--  = concat (map q xs) >>= r
+--  = concat (map r (concat (map q xs)))
+--  = (concat . map r . concat . map q) xs,           using composition instead  
+--  = (concat . concat . map (map r) . map q) xs,     using the map-concat law below 
+--  = (concat . map concat . map (map r) . map q) xs, using the second law instead
+--  = (concat . map (concat . map r . q) xs,          from the basic map/fmap property (functor) 
+--  = xs >= concat . map r . q,                       definition of bind
+--  = xs >= (\x -> (concat . map r . q) x),           extensionality
+--  = xs >= (\x -> (concat . map r) (q x)),           definition of composition (.)
+--  = xs >= (\x -> q x >>= r)                         definition of >= backwards 
+--Hence the law follows from the previously established properties of map and concat, without so much work.
