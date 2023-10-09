@@ -7,6 +7,13 @@ instance Monad Writer where											--Monad instances are defined for the Writ
   return x = Writer ([], x)
   Writer (log1, x) >>= f = let Writer (log2, y) = f x in Writer (log1 ++ log2, y)
 
+instance Functor (Writer log) where
+  fmap f (Writer (log, val)) = Writer (log, f val)
+
+instance Applicative (Writer log) where
+  pure x = Writer ([], x)
+  Writer (log1, f) <*> Writer (log2, x) = Writer (log1 ++ log2, f x)
+
 tell :: String -> Writer ()											--The tell function is used to append log entries to the current journal.
 tell entry = Writer ([entry], ())
 
