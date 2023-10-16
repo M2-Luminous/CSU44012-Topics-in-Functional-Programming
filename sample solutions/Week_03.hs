@@ -62,7 +62,7 @@ instance Monad List where
 --        result will be  [x1] ++ concat [ [x2], [x3] ...], and by the definition of (++) we get
 --        a result of [x1, x2, x3...]
 
-- (3) (m >>= f) >>= g   ===   m >>= (\x -> f x >>= g)
+-- (3) (m >>= f) >>= g   ===   m >>= (\x -> f x >>= g)
 -- Proving associativity is a bit trickier. The standard technique
 -- is to use induction over the list, but the proof is quite long.
 -- Luckily we were only asked for a sketch proof that would be

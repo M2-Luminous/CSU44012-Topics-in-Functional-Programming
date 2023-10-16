@@ -1,0 +1,22 @@
+name:                ShapeExample2
+version:             0.1.0.0
+synopsis:            Simple shape example for CS4012
+description:         Simple shape example for CS4012
+homepage:            https://github.com/g-d-strong/ShapeExample1#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Glenn Strong
+maintainer:          Glenn.Strong@scss.tcd.ie
+copyright:           2017 Glenn Strong
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.10
+extra-source-files:  README.md
+
+executable ShapeExample2
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  other-modules:       Render, Shapes
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+                      ,JuicyPixels
