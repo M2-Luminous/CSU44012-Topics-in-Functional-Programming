@@ -71,10 +71,25 @@ response = renderHtml $ do
             H.img ! A.id (fromString "maskFirstImage") ! A.class_ "image" ! A.src "images/maskExampleFirstOverSecondDrawing" ! A.width "50%"
             H.img ! A.id (fromString "maskSecondImage") ! A.class_ "image" ! A.src "images/maskExampleSecondOverFirstDrawing" ! A.width "50%"
 
+            -- New section for shape details
+            H.h2 "Shape Details"
+            H.ul $ do
+                H.li "Circle: No transformations applied."
+                H.li "Rectangle: ShearXY with parameters 2 and 6."
+                H.li $ do
+                    "Convex Polygon: Composed transformations - "
+                    H.ul $ do
+                        H.li "ShearXY with parameters 3 and 9."
+                        H.li "Rotate by 56 degrees."
+                        H.li "Translate by point (-6, -6) followed by point (6, 6)."
+                H.li "Ellipse: Rotate by 30 degrees."
+                H.li "Mask Examples: Applied over circle and rectangle drawings with mask parameter 120."
+            
+
 -- Shape definitions
-circleDrawing = [(identity, circle, maroon)]
-recetangleDrawing = [(shearXY 2 6, rectangle 4 3, lime_and_yellow_average)]
-convexPolygonDrawing = [(((shearXY 3 9) <+> (rotate 56) <+> (translate (point (-6) (-6))) <+> (translate (point 6 6))), convexPolygon [(point (-1.8) 5.2), (point (3) 0), (point (-1.2) 0), (point (-1.8) 5.2)], yellow)]
-ecplliseDrawing = [(rotate 30, ellipse 3 2, blue)]
+circleDrawing = [(scale (point 3 3), circle, pink)]
+recetangleDrawing = [(shearXY 2 6, rectangle 4 3, aquamarine)]
+convexPolygonDrawing = [(((shearXY 3 9) <+> (rotate 56) <+> (translate (point (-6) (-6))) <+> (translate (point 6 6))), convexPolygon [(point (-1.8) 5.2), (point (3) 0), (point (-1.2) 0), (point (-1.8) 5.2)], salmon)]
+ecplliseDrawing = [(rotate 30, ellipse 3 2, blueviolet)]
 maskExampleFirstOverSecondDrawing = maskFirstOverSecond 120 circleDrawing recetangleDrawing
 maskExampleSecondOverFirstDrawing = maskSecondOverFirst 120 circleDrawing recetangleDrawing
