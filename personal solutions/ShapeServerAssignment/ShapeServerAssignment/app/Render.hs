@@ -1,99 +1,62 @@
-module Render  where
+-- This module is responsible for rendering shapes.
+module Render where
+
+-- Importing necessary modules for image processing and shape definitions.
 import Codec.Picture
 import Shapes
-{--
-{-- 
--
-PixelRGB8 = PixelRGB8 !PixelRGB8 ! PixelRGB8 ! PixelRGB8 
-JuicyPixel Offical document
-https://hackage.haskell.org/package/JuicyPixels-3.3.8/docs/Codec-Picture.html
---}
---}
+import Data.Array
 
-
---  A window specifies what part of the world to render and at which
---  resolution.
---  Values are top left & bottom right corner to be rendered, 
---             and the size of the output device to render into
+-- Definition of a window for rendering, specified by two corner points and resolution.
 data Window = Window Point Point (Int,Int)
 
--- Default window renders a small region around the origin into
--- a 2000 *2000 pixel image
+-- Default window configuration with specified dimensions and resolution.
 defaultWindow :: Window
 defaultWindow = Window (point (-10) (-10)) (point 10 10) (2000,2000)
 
-
--- Generate a list of evenly spaced samples between two values.
--- e.g. samples -1.5 +1.5 25 generates 25 samples evenly spaced
---      between the two bounds: [ -1.5, -1.375, -1.25 ... ]
+-- Function to generate a list of samples between a start and end value, given the number of samples.
 samples :: Double -> Double -> Int -> [Double]
-samples c0 c1 n = take n [ c0, c0 + (c1-c0) / (fromIntegral $ n-1) .. ]
+samples start end numSamples = [start + (end - start) * fromIntegral i / fromIntegral (numSamples - 1) | i <- [0..numSamples-1]]
 
--- Generate the matrix of points corresponding to the pixels of a window.
-pixels :: Window -> [[Point]]
-pixels (Window p0 p1 (w,h)) =
-  [ [ point x y | x <- samples (getX p0) (getX p1) w ]
-                | y <- reverse $ samples (getY p0) (getY p1) h
-  ]
+-- Calculates the coordinate value for a given pixel index in a range.
+sampleCoordinate :: Int -> Double -> Double -> Int -> Double
+sampleCoordinate index start end total = start + ((end - start) / fromIntegral (total - 1)) * fromIntegral index
 
-samplePoint :: Int -> Double -> Double -> Int -> Double
-samplePoint z c0 c1 n = c0 + (((c1-c0) / (fromIntegral $ n-1)) * fromIntegral(z))
--- Precompute  
--- yields the point corresponding to the pixel of a window.  
-pixel :: (Int, Int) -> Window -> Point
-pixel (x,y) (Window p0 p1 (w,h)) = 
-    point pointX pointY
-    where
-      pointX = samplePoint x (getX p0) (getX p1) w
-      pointY = samplePoint (h-y) (getY p0) (getY p1) h
--- generate list of all screen coordinates in window
-coords :: Window -> [[(Int,Int)]]
-coords (Window _ _ (w,h)) = [ [(x,y) | x <- [0..w]] | y <- [0..h] ]
-{--
+-- Maps pixel coordinates to their corresponding points in the window.
+mapPixel :: (Int, Int) -> Window -> Point
+mapPixel (pixelX, pixelY) (Window topLeft bottomRight (width, height)) = 
+    point (sampleCoordinate pixelX (getX topLeft) (getX bottomRight) width) 
+          (sampleCoordinate (height - pixelY) (getY topLeft) (getY bottomRight) height)
 
-Instead for looking up the location online ,we could precompute the pixel in advance 
-like we need to store into an array as the time compleixty for looking for an array 
-is O（1）
+-- Computes an array mapping each pixel to a point in the window.
+computePixelMap :: Window -> Array (Int, Int) Point
+computePixelMap window@(Window topLeft bottomRight (width, height)) = 
+  array ((0, 0), (width - 1, height - 1)) 
+        [((x, y), mapPixel (x, y) window) | x <- [0..width-1], y <- [0..height-1]]
 
---}
--- render a drawing into an image, then save into a file
--- NB: the lookup1 function is a VERY inefficient way to convert screen coordinates to drawing
---     coordinates! It should be possible to do this in O(1) time, not O(N) time!!
+-- Renders a drawing to an image file.
 render :: String -> Window -> Drawing -> IO ()
-render path win sh = writePng path $ generateImage pixRenderer w h
-    where
-      Window _ _ (w,h) = win
+render filePath window shape = writePng filePath $ generateImage pixRenderer width height
+  where
+    Window _ _ (width, height) = window
+    pm = computePixelMap window
 
-      pixRenderer x y = PixelRGB8 (fromIntegral x) (fromIntegral y) (colorForImage $  generatePoint (x,y))
-      
-      generatePoint :: (Int, Int) -> Point
-      generatePoint (x, y) = 
-          if (x >= 0 && x < w && y >= 0 && y < h) then pixel (x,y) win else point 0 0
+    generatePoint (x, y) = pm ! (x, y)
 
-      colorForImage p | p `inside` sh = 255
-                      | otherwise     = 0
-      {--      
-      lookup1 :: (Int,Int) -> [((Int,Int), Point)] -> Point
-      lookup1 a m = case lookup a m of
-                      Nothing -> point 0 0
-                      Just x  -> x
+    -- Pixel renderer that converts a point to a color based on whether it is inside the shape.
+    pixRenderer x y = PixelRGB8 (fromIntegral x) (fromIntegral y) (colorForImage $ generatePoint (x, y))
+    colorForImage p | p `inside` shape = 255
+                    | otherwise     = 0
 
-      locations :: [ ((Int,Int), Point) ]
-      locations = concat $ zipWith zip (coords win) (pixels win)
-      colorForImage p | p `inside` sh = 255
-                      | otherwise     = 0
---}
--- type transformer
+-- Renders a colored drawing to an image file.
 rgbRender :: String -> Window -> ColoredDrawing -> IO ()
-rgbRender path win sh = writePng path $ generateImage pixRenderer w h
-    where
-      Window _ _ (w,h) = win
+rgbRender filePath window shape = writePng filePath $ generateImage pixRenderer width height
+  where
+    Window _ _ (width, height) = window
+    pm = computePixelMap window
 
-      pixRenderer x y = toPixelRGBA8 $ colorPixel (generatePoint (x,y)) sh
-      
-      toPixelRGBA8 :: Color -> PixelRGBA8
-      toPixelRGBA8 col = PixelRGBA8 (r col) (g col) (b col) (a col)
-      
-      generatePoint :: (Int, Int) -> Point
-      generatePoint (x, y) = 
-          if (x >= 0 && x < w && y >= 0 && y < h) then pixel (x,y) win else point 0 0
+    generatePoint (x, y) = pm ! (x, y)
+
+    -- Pixel renderer for colored drawings.
+    pixRenderer x y = toPixelRGBA8 $ colorPixel (generatePoint (x, y)) shape
+    -- Converts a Color value to a PixelRGBA8 value.
+    toPixelRGBA8 col = PixelRGBA8 (r col) (g col) (b col) (a col)
