@@ -102,7 +102,7 @@ colorPixel p drawing = mergeColor p drawing transparent
 mergeColor :: Point -> ColoredDrawing -> Color -> Color
 mergeColor p [] col = col
 mergeColor p ((t,s,c):ds) col = 
-  if insideShape p (t, s) 
+  if convexHull p (t, s) 
     then recursive_call alphabender 
     else recursive_call col 
     where
@@ -141,22 +141,22 @@ switchingLayer alphaValue bottomLayer topLayer = map (adjustVisibility topLayer)
 -}
 
 
----  Inside functionality Added Eclise Recentangle and polygon 
-inside :: Point -> Drawing -> Bool
-inside point drawing = or $ map (insideShape point) drawing
+---  convex functionality Added Eclise Recentangle and polygon 
+convex :: Point -> Drawing -> Bool
+convex point drawing = or $ map (convexHull point) drawing
 
-insideShape :: Point -> (Transform, Shape) -> Bool
-insideShape point (t,s) = isInsideShape (transform t point) s
+convexHull :: Point -> (Transform, Shape) -> Bool
+convexHull point (t,s) = isConvexHull (transform t point) s
 
-isInsideShape :: Point -> Shape -> Bool
-point `isInsideShape` Empty = False
-point `isInsideShape` Circle = distance point <= 1
-point `isInsideShape` Square = maxnorm  point <= 1
-Vector x y `isInsideShape` Rectangle ratio = (sqrt (y**2) <= 1) && (sqrt (x**2) <= ratio)
-Vector x y `isInsideShape` Ellipse ratio = (x**2/ratio**2) + (y**2/1**2) <= 1
+isConvexHull :: Point -> Shape -> Bool
+point `isConvexHull` Empty = False
+point `isConvexHull` Circle = distance point <= 1
+point `isConvexHull` Square = maxnorm  point <= 1
+Vector x y `isConvexHull` Rectangle ratio = (sqrt (y**2) <= 1) && (sqrt (x**2) <= ratio)
+Vector x y `isConvexHull` Ellipse ratio = (x**2/ratio**2) + (y**2/1**2) <= 1
 
-Vector x y `isInsideShape` Polygon (p1:(p2:[])) = intersection (Vector x y) p1 p2
-Vector x y `isInsideShape` Polygon (p1:(p2:ps)) = if intersection (Vector x y) p1 p2 then (Vector x y) `isInsideShape` Polygon (p2:ps) else False
+Vector x y `isConvexHull` Polygon (p1:(p2:[])) = intersection (Vector x y) p1 p2
+Vector x y `isConvexHull` Polygon (p1:(p2:ps)) = if intersection (Vector x y) p1 p2 then (Vector x y) `isConvexHull` Polygon (p2:ps) else False
 
 intersection :: Point -> Point -> Point -> Bool
 intersection (Vector x y) (Vector x1 y1) (Vector x2 y2) =

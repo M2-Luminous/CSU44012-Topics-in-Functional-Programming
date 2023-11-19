@@ -42,9 +42,9 @@ render filePath window shape = writePng filePath $ generateImage pixRenderer wid
 
     generatePoint (x, y) = pm ! (x, y)
 
-    -- Pixel renderer that converts a point to a color based on whether it is inside the shape.
+    -- Pixel renderer that converts a point to a color based on whether it is convex the shape.
     pixRenderer x y = PixelRGB8 (fromIntegral x) (fromIntegral y) (colorForImage $ generatePoint (x, y))
-    colorForImage p | p `inside` shape = 255
+    colorForImage p | p `convex` shape = 255
                     | otherwise     = 0
 
 -- Renders a colored drawing to an image file.
