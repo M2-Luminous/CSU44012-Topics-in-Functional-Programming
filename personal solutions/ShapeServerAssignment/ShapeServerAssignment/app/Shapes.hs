@@ -13,19 +13,19 @@ data Shape = Empty
            | Square
            | Rectangle AspectRatio
            | Ellipse AspectRatio
-           | ConvexPolygon [Point]
+           | Polygon [Point]
              deriving Show
 
 empty, circle, square :: Shape
 rectangle, ellipse :: Double -> Double -> Shape
-convexPolygon :: [Point] -> Shape
+polygon :: [Point] -> Shape
 
 empty = Empty
 circle = Circle
 square = Square
 rectangle width height = Rectangle (width/height)
 ellipse width height = Ellipse (width/height)
-convexPolygon (p:ps) = ConvexPolygon (p:ps)
+polygon (p:ps) = Polygon (p:ps)
 
 data Transform = Identity
            | Translate Vector
@@ -116,8 +116,32 @@ blendColor backgroundCol foregroundCol foregroundAlpha = fromIntegral $ (bc * (2
           fc = fromIntegral foregroundCol
           fa = fromIntegral foregroundAlpha
 
+--- Another approach to optimize overlapping rendering
+{-
+switchingLayer :: Word8 -> ColoredDrawing -> ColoredDrawing -> ColoredDrawing
+switchingLayer alphaValue bottomLayer topLayer = map (adjustVisibility topLayer) bottomLayer
+  where
+    adjustVisibility :: ColoredDrawing -> (Transform, Shape, Color) -> (Transform, Shape, Color)
+    adjustVisibility topLayer shape@(t, s, c) =
+        if isObscured shape topLayer
+        then (t, s, c { a = adjustedAlphaValue }) -- Adjust alpha based on overlap
+        else shape
 
----  Inside functionality Added Eclise Recentangle and ConvexPolygon 
+    -- Assuming that shapes will always intersect
+    overlaps :: (Transform, Shape, Color) -> (Transform, Shape, Color) -> Bool
+    overlaps _ _ = True
+    
+    -- Function to determine if a shape is obscured by any in the top layer
+    isObscured :: (Transform, Shape, Color) -> ColoredDrawing -> Bool
+    isObscured bottomShape topLayer = any (\topShape -> overlaps bottomShape topShape) topLayer
+
+
+    adjustedAlphaValue :: Word8
+    adjustedAlphaValue = alphaValue -- Modify this based on the extent of the overlap
+-}
+
+
+---  Inside functionality Added Eclise Recentangle and polygon 
 inside :: Point -> Drawing -> Bool
 inside point drawing = or $ map (insideShape point) drawing
 
@@ -131,11 +155,11 @@ point `isInsideShape` Square = maxnorm  point <= 1
 Vector x y `isInsideShape` Rectangle ratio = (sqrt (y**2) <= 1) && (sqrt (x**2) <= ratio)
 Vector x y `isInsideShape` Ellipse ratio = (x**2/ratio**2) + (y**2/1**2) <= 1
 
-Vector x y `isInsideShape` ConvexPolygon (p1:(p2:[])) = halfPlaneIntersection (Vector x y) p1 p2
-Vector x y `isInsideShape` ConvexPolygon (p1:(p2:ps)) = if halfPlaneIntersection (Vector x y) p1 p2 then (Vector x y) `isInsideShape` ConvexPolygon (p2:ps) else False
+Vector x y `isInsideShape` Polygon (p1:(p2:[])) = intersection (Vector x y) p1 p2
+Vector x y `isInsideShape` Polygon (p1:(p2:ps)) = if intersection (Vector x y) p1 p2 then (Vector x y) `isInsideShape` Polygon (p2:ps) else False
 
-halfPlaneIntersection :: Point -> Point -> Point -> Bool
-halfPlaneIntersection (Vector x y) (Vector x1 y1) (Vector x2 y2) =
+intersection :: Point -> Point -> Point -> Bool
+intersection (Vector x y) (Vector x1 y1) (Vector x2 y2) =
     crossProduct (Vector (x1 - x) (y1 - y)) (Vector (x2 - x1) (y2 - y1)) < 0
     where crossProduct (Vector a b) (Vector c d) = a * d - b * c
 
@@ -173,3 +197,5 @@ matrix a b c d = Matrix (Vector a b) (Vector c d)
 
 getX (Vector x y) = x
 getY (Vector x y) = y
+
+
