@@ -87,9 +87,19 @@ response = renderHtml $ do
             
 
 -- Shape definitions
-circleDrawing = [(scale (point 3 3), circle, pink)]
-recetangleDrawing = [(shearXY 2 6, rectangle 4 3, aquamarine)]
-convexPolygonDrawing = [(((shearXY 3 9) <+> (rotate 56) <+> (translate (point (-6) (-6))) <+> (translate (point 6 6))), convexPolygon [(point (-1.8) 5.2), (point (3) 0), (point (-1.2) 0), (point (-1.8) 5.2)], salmon)]
-ecplliseDrawing = [(rotate 30, ellipse 3 2, blueviolet)]
-maskExampleFirstOverSecondDrawing = maskFirstOverSecond 120 circleDrawing recetangleDrawing
-maskExampleSecondOverFirstDrawing = maskSecondOverFirst 120 circleDrawing recetangleDrawing
+circleDrawing = [
+    (scale (point 3 3) <+> (translate (point (-1) (1))), circle, pink),  -- Circle 1
+    (identity <+> (translate (point (4) (3))), circle, red)]             -- Circle 2
+    
+recetangleDrawing = [(shearX 2 <+> (translate (point (-3) (0))), rectangle 4 3, powderblue), -- Rectangle 1
+                     (shearY 2 <+> (translate (point (0) (0))), rectangle 4 3, aquamarine),  -- Rectangle 2
+                     (shearXY 2 2 <+> (translate (point (3) (0))), rectangle 4 3, turquoise)]-- Rectangle 3
+
+
+convexPolygonDrawing = [(scale (point 2 2) <+> (translate (point (0) (-2))), convexPolygon [(point (0) 3.464), (point (2) 0), (point (-2) 0), (point (0) 3.464)], salmon)]
+
+ecplliseDrawing = [(rotate 90, ellipse 8 2, gold),      -- Eclipse 1
+                   (rotate 270, ellipse 8 2, khaki)]    -- Eclipse 2
+
+maskExampleFirstOverSecondDrawing = switchingLayer 255 convexPolygonDrawing ecplliseDrawing
+maskExampleSecondOverFirstDrawing = switchingLayer 255 ecplliseDrawing convexPolygonDrawing

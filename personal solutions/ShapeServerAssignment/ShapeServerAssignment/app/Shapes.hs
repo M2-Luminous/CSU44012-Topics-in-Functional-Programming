@@ -76,26 +76,25 @@ data Color = Color {
 createColor :: Word8 -> Word8 -> Word8 -> Word8 -> Color
 createColor = Color
 
-red, green, blue, pink, aquamarine, salmon, blueviolet, transparent :: Color
+red, green, blue, pink, aquamarine, salmon, gold, khaki, turquoise, powderblue, transparent :: Color
 red = createColor 255 0 0 255
 green = createColor 0 255 0 255
 blue = createColor 0 0 255 255
 pink = createColor 255 192 203 255
 aquamarine = createColor 127 255 212 255
 salmon = createColor 250 128 114 255
-blueviolet = createColor 138 43 226 255
+gold = createColor 255 215 0 255
+khaki = createColor 255 246 143 255
+turquoise = createColor 64 224 208 255
+powderblue = createColor 176 224 230 255
 transparent = createColor 255 255 255 0
 
 -- Mask functions
-maskFirstOverSecond, maskSecondOverFirst :: Word8 -> ColoredDrawing -> ColoredDrawing -> ColoredDrawing
+switchingLayer:: Word8 -> ColoredDrawing -> ColoredDrawing -> ColoredDrawing
 
-maskFirstOverSecond _ _ [] = []
-maskFirstOverSecond alphaValue [] ((mt, ms, mc) : rest) = (mt, ms, mc { a = alphaValue }) : maskFirstOverSecond alphaValue [] rest
-maskFirstOverSecond alphaValue ((bt, bs, bc) : rest) secondP = (bt, bs, bc) : maskFirstOverSecond alphaValue rest secondP 
-
-maskSecondOverFirst _ _ [] = []
-maskSecondOverFirst alphaValue ((mt, ms, mc) : rest) [] = (mt, ms, mc { a = alphaValue }) : maskSecondOverFirst alphaValue rest []
-maskSecondOverFirst alphaValue firstP ((bt, bs, bc) : rest) = (bt, bs, bc) : maskSecondOverFirst alphaValue firstP rest
+switchingLayer _ _ [] = []
+switchingLayer alphaValue [] ((mt, ms, mc) : rest) = (mt, ms, mc { a = alphaValue }) : switchingLayer alphaValue [] rest
+switchingLayer alphaValue ((bt, bs, bc) : rest) secondP = (bt, bs, bc) : switchingLayer alphaValue rest secondP 
 
 colorPixel :: Point -> ColoredDrawing -> Color
 colorPixel p drawing = mergeColor p drawing transparent 
