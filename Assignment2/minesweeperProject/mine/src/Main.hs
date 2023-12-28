@@ -109,32 +109,25 @@ setup w = do
     on UI.click mine $ \_ -> updateGameState Sweep "Sweep"
     on UI.click mark $ \_ -> updateGameState Mark "Mark"
     on UI.click auto $ \_ -> do
-        (b, st) <- liftIO $ readIORef $ refb
-        return t # set UI.text "Auto Player Running"
+        (b, st) <- liftIO $ readIORef refb
         case st of
-            Over -> return ()
-            _ -> do
-                 let (newb, verdict) = autoMove b
-                 case verdict of
+            Over -> void $ return t # set UI.text "Game Already Over"
+            _    -> do
+                void $ return t # set UI.text "Auto Player Running"
+                let (newb, verdict) = autoMove b
+                case verdict of
                     GameOver -> do
                         liftIO $ writeIORef refb (newb, Over)
                         board2svg w refb (isClicked w refb)
-                        return t # set UI.text "Game Over!!!"
-                        return ()
-                    _ -> do
-                        if (isWin newb) then do
-                            t <- getElementById w "text"
+                        void $ return t # set UI.text "Game Over!!!"
+                    _ -> if isWin newb then do
                             liftIO $ writeIORef refb (newb, Over)
                             board2svg w refb (isClicked w refb)
-                            case t of
-                                Just t -> do
-                                    return t # set UI.text "Congratulations, You Win!!!"; 
-                                    return ()
-                                _ -> return ()
-                        else do
+                            void $ return t # set UI.text "Congratulations, You Win!!!"
+                         else do
                             liftIO $ writeIORef refb (newb, st)
                             board2svg w refb (isClicked w refb)
-                            return ()   
+
 
     -- Set window title
     void $ return w # set title "mine sweeper"
@@ -194,8 +187,8 @@ board2svg w refb event = do
     getElementById w "container" >>= \case
         Just container -> do
             void $ element container # set html ""
-            let svgHeight = show (dx * size)
-            let svgWidth = show (dy * size)
+            let svgHeight = show (dx * 30)
+            let svgWidth = show (dy * 30)
             context <- SVG.svg # set SVG.height svgHeight # set SVG.width svgWidth
             void $ element container #+ [element context]
             mapM_ (mineElement context event) (idxboard b)
