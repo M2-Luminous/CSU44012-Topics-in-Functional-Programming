@@ -49,85 +49,68 @@ gameGUI = do
     
 data GameState = 
     Start  | 
-    Sweep   | 
+    Sweep  | 
     Mark   |
     Over 
     deriving (Show, Eq, Ord)
     
+-- Helper function for creating input fields
+createInputField :: String -> String -> [(String, String)] -> UI Element
+createInputField id value styles = UI.input
+    # set UI.id_ id
+    # set UI.value value
+    # set style styles
+
+-- Helper function for creating buttons
+createButton :: String -> [(String, String)] -> UI Element
+createButton text styles = UI.button
+    # set UI.text text
+    # set style styles
 
 setup :: Window -> UI ()
 setup w = do
-
     t1 <- UI.div
-       # set text "Welcome to Mine Sweeper Game"
-       # set style [("color", "black"), ("font-size", "20px"), ("position", "absolute"), ("left", "630px"), ("top", "10px")]
+        # set text "Welcome to Mine Sweeper Game"
+        # set style [("color", "black"), ("font-size", "20px"), ("position", "absolute"), ("left", "630px"), ("top", "10px")]
 
-    return w # set title "mine"
-    t <- UI.div
-       # set UI.id_ "text"
-       
-    s1 <- UI.input
-       # set UI.value "16"
-       # set UI.id_ "s1"
-       # set style [("position", "absolute"), ("left", "1300px"), ("top", "50px"), ("transform", "scale(1.5)")]
-       
-    s2 <- UI.input
-       # set UI.value "16"
-       # set UI.id_ "s2"
-       # set style [("position", "absolute"), ("left", "1300px"), ("top", "100px"), ("transform", "scale(1.5)")]
-       
-    s3 <- UI.input
-       # set UI.value "20"
-       # set UI.id_ "s3"
-       # set style [("position", "absolute"), ("left", "1300px"), ("top", "150px"), ("transform", "scale(1.5)")]
-       
-    newgame <- UI.button
-       # set UI.text "New  Games"
-       # set style [("position", "absolute"), ("left", "1300px"), ("top", "250px"), ("transform", "scale(2.0)")]
-    
-    mine <- UI.button
-       # set UI.text "Sweep Mine"
-       # set style [("position", "absolute"), ("left", "1300px"), ("top", "350px"), ("transform", "scale(2.0)")]
-           
-    mark <- UI.button
-       # set UI.text "Flag Mines"
-       # set style [("position", "absolute"), ("left", "1300px"), ("top", "450px"), ("transform", "scale(2.0)")]
-    
-    auto <- UI.button
-       # set UI.text "Play Moves"  
-       # set style [("position", "absolute"), ("left", "1300px"), ("top", "550px"), ("transform", "scale(2.0)")]   
+    t <- UI.div # set UI.id_ "text"
+
+    s1 <- createInputField "s1" "16" [("position", "absolute"), ("left", "1300px"), ("top", "50px"), ("transform", "scale(1.5)")]
+    s2 <- createInputField "s2" "16" [("position", "absolute"), ("left", "1300px"), ("top", "100px"), ("transform", "scale(1.5)")]
+    s3 <- createInputField "s3" "20" [("position", "absolute"), ("left", "1300px"), ("top", "150px"), ("transform", "scale(1.5)")]
+
+    newgame <- createButton "New Games" [("position", "absolute"), ("left", "1300px"), ("top", "250px"), ("transform", "scale(2.0)")]
+    mine <- createButton "Sweep Mine" [("position", "absolute"), ("left", "1300px"), ("top", "350px"), ("transform", "scale(2.0)")]
+    mark <- createButton "Flag Mines" [("position", "absolute"), ("left", "1300px"), ("top", "450px"), ("transform", "scale(2.0)")]
+    auto <- createButton "Play Moves" [("position", "absolute"), ("left", "1300px"), ("top", "550px"), ("transform", "scale(2.0)")]
 
     getBody w #+ [element s1, element s2, element s3, element newgame, element mine, element mark, element auto, element t1]
-    
-    refb <- liftIO $ newIORef $ (Board (0, 0) [], Start)
-    
+    container <- UI.div #. "wrap" # set UI.id_ "container"
+    getBody w #+ [element t, element container]
+
+    refb <- liftIO $ newIORef (Board (0, 0) [], Start)
+
+    let updateGameState newState textUpdate = do
+            (b, st) <- liftIO $ readIORef refb
+            unless (st == Over) $ do
+                void $ element t # set UI.text textUpdate
+                liftIO $ writeIORef refb (b, newState)
+
     on UI.click newgame $ \_ -> do
-        return t # set UI.text "New Game"
         ss1 <- s1 # UI.get UI.value
         ss2 <- s2 # UI.get UI.value
         ss3 <- s3 # UI.get UI.value
         bw <- liftIO $ makeBoard (read ss1) (read ss2) (read ss3) []
         liftIO $ writeIORef refb (bw, Start)
-        board2svg w refb (clicked w refb)
-        
-    on UI.click mine $ \_ -> do
-        (b, st) <- liftIO $ readIORef $ refb
-        case st of
-            Over -> return ()
-            _ -> do
-                return t # set UI.text "Sweep"
-                liftIO $ writeIORef refb (b, Sweep)  
-    
-    on UI.click mark $ \_ -> do
-        (b, st) <- liftIO $ readIORef $ refb
-        case st of
-            Over -> return ()
-            _ -> do
-                return t # set UI.text "Mark"
-                liftIO $ writeIORef refb (b, Mark)
-    
+        board2svg w refb (isClicked w refb)
+        return t # set UI.text "New Game Started"
+        return()
+
+    on UI.click mine $ \_ -> updateGameState Sweep "Sweep"
+    on UI.click mark $ \_ -> updateGameState Mark "Mark"
     on UI.click auto $ \_ -> do
         (b, st) <- liftIO $ readIORef $ refb
+        return t # set UI.text "Auto Player Running"
         case st of
             Over -> return ()
             _ -> do
@@ -135,14 +118,14 @@ setup w = do
                  case verdict of
                     GameOver -> do
                         liftIO $ writeIORef refb (newb, Over)
-                        board2svg w refb (clicked w refb)
+                        board2svg w refb (isClicked w refb)
                         return t # set UI.text "Game Over!!!"
                         return ()
                     _ -> do
                         if (isWin newb) then do
                             t <- getElementById w "text"
                             liftIO $ writeIORef refb (newb, Over)
-                            board2svg w refb (clicked w refb)
+                            board2svg w refb (isClicked w refb)
                             case t of
                                 Just t -> do
                                     return t # set UI.text "Congratulations, You Win!!!"; 
@@ -150,19 +133,15 @@ setup w = do
                                 _ -> return ()
                         else do
                             liftIO $ writeIORef refb (newb, st)
-                            board2svg w refb (clicked w refb)
+                            board2svg w refb (isClicked w refb)
                             return ()   
-                 
-            
-    container <- UI.div #. "wrap"
-       # set UI.id_ "container"
+
+    -- Set window title
+    void $ return w # set title "mine sweeper"
+
     
-    getBody w #+ [element t]
-    getBody w #+ [element container]
-    return ()
-    
-clicked :: Window -> IORef (Board, GameState) -> (Int, Int) -> (Double, Double) -> UI ()
-clicked w refb xxyy _ = do
+isClicked :: Window -> IORef (Board, GameState) -> (Int, Int) -> (Double, Double) -> UI ()
+isClicked w refb xxyy _ = do
     (bb, st) <- liftIO $ readIORef refb
     case st of
         Start -> do
@@ -175,12 +154,12 @@ clicked w refb xxyy _ = do
             newb <- liftIO $ makeBoard (read ss1) (read ss2) (read ss3) [xxyy]
             let (newb', _) = clickBoardAt xxyy newb
             liftIO $ writeIORef refb (newb', Sweep)
-            board2svg w refb (clicked w refb)
+            board2svg w refb (isClicked w refb)
 
         Mark -> do
             let (newb, _) = flagBoardAt xxyy bb
             liftIO $ writeIORef refb (newb, Mark)
-            board2svg w refb (clicked w refb)
+            board2svg w refb (isClicked w refb)
 
         Sweep -> do
             let (newb, verdict) = sweepOrFlag xxyy bb
@@ -188,7 +167,7 @@ clicked w refb xxyy _ = do
                 GameOver -> getElementById w "text" >>= \case
                     Just t -> do
                         liftIO $ writeIORef refb (newb, Over)
-                        board2svg w refb (clicked w refb)
+                        board2svg w refb (isClicked w refb)
                         void $ element t # set UI.text "GameOver"
                     _ -> return ()
                 
@@ -197,13 +176,13 @@ clicked w refb xxyy _ = do
                         getElementById w "text" >>= \case
                             Just t -> do
                                 liftIO $ writeIORef refb (newb, Over)
-                                board2svg w refb (clicked w refb)
+                                board2svg w refb (isClicked w refb)
                                 void $ element t # set UI.text "Win"
                             _ -> return ()
 
                     unless (isWin newb) $ do
                         liftIO $ writeIORef refb (newb, st)
-                        board2svg w refb (clicked w refb)
+                        board2svg w refb (isClicked w refb)
 
         _ -> return ()
 
