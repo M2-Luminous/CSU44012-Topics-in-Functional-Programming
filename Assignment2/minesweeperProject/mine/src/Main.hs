@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 module Main (main) where
 import Mine
 import Lib
@@ -160,14 +161,10 @@ setup w = do
     getBody w #+ [element container]
     return ()
     
-clicked :: Window
-                   -> IORef (Board, GameState)
-                   -> (Int, Int)
-                   -> (Double, Double)
-                   -> UI ()    
-clicked w refb = \xxyy -> \_ -> do
-     (bb, st)  <- liftIO $ readIORef refb
-     case st of
+clicked :: Window -> IORef (Board, GameState) -> (Int, Int) -> (Double, Double) -> UI ()
+clicked w refb xxyy _ = do
+    (bb, st) <- liftIO $ readIORef refb
+    case st of
         Start -> do
             s1 <- fromJust <$> getElementById w "s1"
             s2 <- fromJust <$> getElementById w "s2"
@@ -179,57 +176,52 @@ clicked w refb = \xxyy -> \_ -> do
             let (newb', _) = clickBoardAt xxyy newb
             liftIO $ writeIORef refb (newb', Sweep)
             board2svg w refb (clicked w refb)
+
         Mark -> do
             let (newb, _) = flagBoardAt xxyy bb
             liftIO $ writeIORef refb (newb, Mark)
             board2svg w refb (clicked w refb)
-            return ()
-            
+
         Sweep -> do
             let (newb, verdict) = sweepOrFlag xxyy bb
             case verdict of 
-                GameOver -> do
-                    t <- getElementById w "text"
-                    case t of
-                        Just t -> do
-                            liftIO $ writeIORef refb (newb, Over)
-                            board2svg w refb (clicked w refb)
-                            return t # set UI.text "GameOver"
-                            return ()
-                        _ -> return ()
-                    return ()
-                _ -> do
-                    if (isWin newb) then do
-                        t <- getElementById w "text"
+                GameOver -> getElementById w "text" >>= \case
+                    Just t -> do
                         liftIO $ writeIORef refb (newb, Over)
                         board2svg w refb (clicked w refb)
-                        case t of
+                        void $ element t # set UI.text "GameOver"
+                    _ -> return ()
+                
+                _ -> do
+                    when (isWin newb) $ do
+                        getElementById w "text" >>= \case
                             Just t -> do
-                                return t # set UI.text "Win"; 
-                                return ()
+                                liftIO $ writeIORef refb (newb, Over)
+                                board2svg w refb (clicked w refb)
+                                void $ element t # set UI.text "Win"
                             _ -> return ()
-                    else do
+
+                    unless (isWin newb) $ do
                         liftIO $ writeIORef refb (newb, st)
                         board2svg w refb (clicked w refb)
-                        return ()   
-        _ -> return ()
-     return ()
 
+        _ -> return ()
+
+
+board2svg :: Window -> IORef (Board, GameState) -> ((Int, Int) -> (Double, Double) -> UI ()) -> UI ()
 board2svg w refb event = do
     (b, _st) <- liftIO $ readIORef refb
     let (dx, dy) = dimension b
-    container <- getElementById w "container"
-    
-    case container of 
+    getElementById w "container" >>= \case
         Just container -> do
-            return container # set html ""
-            context <- SVG.svg
-                # set SVG.height (show (dx * size))
-                # set SVG.width  (show (dy * size))
-            element container #+ [element context]        
+            void $ element container # set html ""
+            let svgHeight = show (dx * size)
+            let svgWidth = show (dy * size)
+            context <- SVG.svg # set SVG.height svgHeight # set SVG.width svgWidth
+            void $ element container #+ [element context]
             mapM_ (mineElement context event) (idxboard b)
-        _ -> return ()
-    return ()
+        Nothing -> return ()
+
     
 size = 30   
     
