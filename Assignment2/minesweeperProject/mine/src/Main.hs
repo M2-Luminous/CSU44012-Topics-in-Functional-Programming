@@ -71,7 +71,7 @@ setup :: Window -> UI ()
 setup w = do
     t1 <- UI.div
         # set text "Welcome to Mine Sweeper Game"
-        # set style [("color", "black"), ("font-size", "20px"), ("position", "absolute"), ("left", "630px"), ("top", "10px")]
+        # set style [("color", "black"), ("font-30", "20px"), ("position", "absolute"), ("left", "630px"), ("top", "10px")]
 
     t <- UI.div # set UI.id_ "text"
 
@@ -193,69 +193,82 @@ board2svg w refb event = do
             void $ element container #+ [element context]
             mapM_ (mineElement context event) (idxboard b)
         Nothing -> return ()
-
-    
-size = 30   
     
 mineElement context e ((x, y), b) = do
     r <- SVG.g
     on UI.mouseup r (e (x, y))
     
+    -- Base rectangle for each cell
     rect <- SVG.rect
-        # set SVG.y (show (x * size))
-        # set SVG.width (show size)
-        # set SVG.x (show (y * size))
-        # set SVG.height (show size)
-        # set SVG.stroke "black"
-        # set SVG.stroke_width "4"
-        # set SVG.fill "transparent"
-    return r #+ [element rect]
-    return context #+ [element r]
+        # set SVG.y (show (x * 30))
+        # set SVG.width (show 30)
+        # set SVG.x (show (y * 30))
+        # set SVG.height (show 30)
+        # set SVG.stroke "grey"
+        # set SVG.stroke_width "1"
+        # set SVG.fill (case b of
+                         Cell _ Hidden -> "#D3D3D3"
+                         _             -> "#FFFFFF")
+    _ <- return r #+ [element rect]
+
     case b of
-        (Cell _ Hidden) -> do
-            rr <- SVG.rect
-                # set SVG.y (show (x * size + 2) )
-                # set SVG.width (show (size - 4))
-                # set SVG.x (show (y * size + 2) )
-                # set SVG.height (show (size - 4))
-                # set SVG.stroke "green"
-                # set SVG.stroke_width "2"
-                # set SVG.fill "transparent"
-            return r #+ [element rr]
-            return ()                
-        (Cell Mine Revealed) -> do
+        Cell _ Hidden -> return ()
+
+        Cell Mine Revealed -> do
+            -- Enhanced mine symbol
             circle <- SVG.circle
-                # set SVG.cy (show (x * size + size `div` 2))
-                # set SVG.cx (show (y * size + size `div` 2))
-                # set SVG.r (show (size `div` 2 * 8 `div` 10))
-                # set SVG.fill "white"
-                # set SVG.stroke "black"
-                # set SVG.stroke_width "4"
-            return r #+ [element circle]
+                # set SVG.cy (show (x * 30 + 30 `div` 2))
+                # set SVG.cx (show (y * 30 + 30 `div` 2))
+                # set SVG.r (show (30 `div` 4))
+                # set SVG.fill "red"
+            _ <- return r #+ [element circle]
             return ()
-        (Cell (Space 0) Revealed) ->
-            return ()
-        (Cell (Space n) Revealed) -> do
+
+        Cell (Space 0) Revealed -> return ()
+
+        Cell (Space n) Revealed -> do
+            -- Number with bold, clear font
             text <- SVG.text
-                # set SVG.y (show (x * size + size `div` 2))
-                # set SVG.x (show (y * size + size `div` 2))
+                # set SVG.y (show (x * 30 + 30 `div` 2 + 5))
+                # set SVG.x (show (y * 30 + 30 `div` 2))
                 # set text (show n)
                 # set (attr "dominant-baseline") "middle" 
                 # set (attr "text-anchor") "middle"
-            return r #+ [element text]
+                # set SVG.fill (numberColor n)
+                # set SVG.font_size "20px"
+                # set SVG.font_weight "bold"
+            _ <- return r #+ [element text]
             return ()
-            
-        (Cell _ Flag) -> do
-            text <- SVG.path
-                # set SVG.y (show (x * size + size `div` 2))
-                # set SVG.x (show (y * size + size `div` 2))
-                # set (attr "d") "M 0 0 L 0 -12 L 10 -6 L 0 0 M -10 10 L 0 10 M 0 0 L 0 10"
-                # set (attr "transform") (printf "translate(%d, %d)" (y * size + size `div` 2) (x * size + size `div` 2))
-                # set SVG.stroke "blue"
-                # set SVG.stroke_width "2"
-            return r #+ [element text]
-            return ()            
-        _ -> do return ()                
+
+        Cell _ Flag -> do
+            -- Flag pole
+            pole <- SVG.rect
+                # set SVG.x (show (y * 30 + 30 `div` 4))
+                # set SVG.y (show (x * 30 + 30 `div` 4))
+                # set SVG.width "2"
+                # set SVG.height (show (30 `div` 2))
+                # set SVG.fill "black"
+            _ <- return r #+ [element pole]
+
+            -- Flag cloth
+            flagCloth <- SVG.path
+                # set (attr "d") (printf "M %d %d l 12 6 -12 6 z" (y * 30 + 30 `div` 4 + 2) (x * 30 + 30 `div` 4))
+                # set SVG.fill "red"
+            _ <- return r #+ [element flagCloth]
+
+            return ()
+
+    return context #+ [element r]
+
+-- Function to determine the color of numbers
+numberColor :: Int -> String
+numberColor n = case n of
+    1 -> "blue"
+    2 -> "green"
+    3 -> "red"
+    4 -> "purple"
+    _ -> "black"
+
     
 
 main :: IO ()
