@@ -179,11 +179,10 @@ isClicked w refb xxyy _ = do
 
         _ -> return ()
 
-
 board2svg :: Window -> IORef (Board, GameState) -> ((Int, Int) -> (Double, Double) -> UI ()) -> UI ()
 board2svg w refb event = do
     (b, _st) <- liftIO $ readIORef refb
-    let (dx, dy) = dimension b
+    let Board (dx, dy) _ = b
     getElementById w "container" >>= \case
         Just container -> do
             void $ element container # set html ""

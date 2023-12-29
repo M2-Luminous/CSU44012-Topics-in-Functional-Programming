@@ -11,28 +11,20 @@ type Dimension = (Int, Int)
 type Point = (Int, Int)
 data Board = Board Dimension [[BoardCell]]  deriving (Show, Eq, Ord)
 
-dimension :: Board -> Dimension
-dimension (Board x _) = x
-
-board :: Board -> [[BoardCell]]
-board (Board _ x) = x
-
 idxboard :: Board -> [(Point, BoardCell)]
 idxboard (Board (dx, dy) b) = 
     [ ((x, y), b !! x !! y)   | x <- [0..dx-1], y <- [0..dy-1] ]
 
 get :: Point -> Board -> Maybe BoardCell
-get (x, y) (Board _ a) = 
-    case safeGet x a of
-        Just b -> safeGet y b
-        _ -> Nothing
-        
-safeGet :: (Num t, Ord t) => t -> [a] -> Maybe a        
-safeGet _ [] = Nothing
-safeGet 0 (x:_) = Just x
-safeGet n (_:xs) 
-    | n < 0 = Nothing
-    | otherwise = safeGet (n - 1) xs
+get (x, y) (Board _ a) = do
+    row <- safeRow x a
+    safeCell y row
+  where
+    safeRow :: Int -> [[BoardCell]] -> Maybe [BoardCell]
+    safeRow n rows = if n >= 0 && n < length rows then Just (rows !! n) else Nothing
+
+    safeCell :: Int -> [BoardCell] -> Maybe BoardCell
+    safeCell n cells = if n >= 0 && n < length cells then Just (cells !! n) else Nothing
     
 put :: Point -> BoardCell -> Board -> Board    
 put (x, y) z (Board (xx, yy) a) =
@@ -92,24 +84,6 @@ flagBoardAt (x, y) b =
         Just _ -> (b, Continue)
         _ -> (b, GameOver)       
    
-printBoardInner :: Board -> String
-printBoardInner (Board _ b) = 
-    unlines (map (unwords . map ch) b)
-    where
-        ch (Cell Mine _) = "X"
-        ch _ = "."
-        
-        
-printBoardOuter :: Board -> String
-printBoardOuter (Board _ b) = 
-    unlines (map (unwords . map ch) b)
-    where
-        ch (Cell Mine Revealed) = "X"
-        ch (Cell (Space 0) Revealed) = " "
-        ch (Cell (Space n) Revealed) = show n
-        ch (Cell _ Hidden) = "."
-        ch (Cell _ Flag) = "P"
-        ch (Cell _ Question) = "?"
         
 isWin :: Board -> Bool
 isWin (Board _ b) = 
@@ -125,7 +99,6 @@ getNeighbors (x, y) b =
     [ ((x + dx, y + dy), fromJust z) | dx <- [-1..1], dy <- [-1..1], dx /= 0 || dy /= 0,
                   let z = get (x + dx, y + dy) b,
                   isJust z ]
-
 
         
 obviousMines :: Board -> [Point]
