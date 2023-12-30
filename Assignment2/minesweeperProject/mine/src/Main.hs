@@ -11,21 +11,21 @@ import Data.IORef
 import Text.Printf
 import Data.Maybe
 
-makeBoard :: Int -> Int -> Int -> [(Int, Int)] -> IO Board
-makeBoard dimx dimy count forbidden = do
+initBoard :: Int -> Int -> Int -> [(Int, Int)] -> IO Board
+initBoard dimx dimy count forbidden = do
     randomCells <- rnd
     return $ foldr placeMine initial randomCells
   where
     initial = Board (dimx, dimy) [  [ Cell (Space 0) Hidden | _ <- [0..dimy - 1]] | _ <- [0..dimx - 1] ]
     indices = [(x, y) | x <- [0..dimx - 1], y <- [0..dimy - 1], (x, y) `notElem` forbidden]
     rnd = sampleN count indices
-    placeMine xy = put xy (Cell Mine Hidden)
+    placeMine xy = putter xy (Cell Mine Hidden)
 
     
 sweepOrFlag :: Point -> Board -> (Board, Result)
 sweepOrFlag (x, y) b
-    | isFlagging = flagBoardAt point b
-    | otherwise  = clickBoardAt point b
+    | isFlagging = markingMines point b
+    | otherwise  = sweepingMines point b
   where
     isFlagging = x < 0 && y < 0
     point = (abs x, abs y)
@@ -33,11 +33,11 @@ sweepOrFlag (x, y) b
     
 autoMove :: Board -> (Board, Result)
 autoMove b = 
-    case obviousMines b of
-        (x:_) -> flagBoardAt x b
+    case saveMove b of
+        (x:_) -> markingMines x b
         _ ->
-            case obviousNonMines b of
-                (x:_) -> clickBoardAt x b
+            case dangerousMove b of
+                (x:_) -> sweepingMines x b
                 _ -> 
                     (b, Continue)    
 
@@ -71,17 +71,17 @@ setup :: Window -> UI ()
 setup w = do
     t1 <- UI.div
         # set text "Welcome to Mine Sweeper Game"
-        # set style [("color", "black"), ("font-30", "20px"), ("position", "absolute"), ("left", "630px"), ("top", "10px")]
+        # set style [("color", "black"), ("font-30", "40px"), ("position", "absolute"), ("left", "630px"), ("top", "10px")]
 
     t <- UI.div # set UI.id_ "text"
 
     s1 <- createInputField "s1" "16" [("position", "absolute"), ("left", "1300px"), ("top", "50px"), ("transform", "scale(1.5)")]
     s2 <- createInputField "s2" "16" [("position", "absolute"), ("left", "1300px"), ("top", "100px"), ("transform", "scale(1.5)")]
-    s3 <- createInputField "s3" "20" [("position", "absolute"), ("left", "1300px"), ("top", "150px"), ("transform", "scale(1.5)")]
+    s3 <- createInputField "s3" "30" [("position", "absolute"), ("left", "1300px"), ("top", "150px"), ("transform", "scale(1.5)")]
 
     newgame <- createButton "New Games" [("position", "absolute"), ("left", "1300px"), ("top", "250px"), ("transform", "scale(2.0)")]
     mine <- createButton "Sweep Mine" [("position", "absolute"), ("left", "1300px"), ("top", "350px"), ("transform", "scale(2.0)")]
-    mark <- createButton "Flag Mines" [("position", "absolute"), ("left", "1300px"), ("top", "450px"), ("transform", "scale(2.0)")]
+    mark <- createButton "Mark Mines" [("position", "absolute"), ("left", "1300px"), ("top", "450px"), ("transform", "scale(2.0)")]
     auto <- createButton "Play Moves" [("position", "absolute"), ("left", "1300px"), ("top", "550px"), ("transform", "scale(2.0)")]
 
     getBody w #+ [element s1, element s2, element s3, element newgame, element mine, element mark, element auto, element t1]
@@ -100,9 +100,9 @@ setup w = do
         ss1 <- s1 # UI.get UI.value
         ss2 <- s2 # UI.get UI.value
         ss3 <- s3 # UI.get UI.value
-        bw <- liftIO $ makeBoard (read ss1) (read ss2) (read ss3) []
+        bw <- liftIO $ initBoard (read ss1) (read ss2) (read ss3) []
         liftIO $ writeIORef refb (bw, Start)
-        board2svg w refb (isClicked w refb)
+        boardToSVG w refb (isClicked w refb)
         return t # set UI.text "New Game Started"
         return()
 
@@ -118,15 +118,15 @@ setup w = do
                 case verdict of
                     GameOver -> do
                         liftIO $ writeIORef refb (newb, Over)
-                        board2svg w refb (isClicked w refb)
+                        boardToSVG w refb (isClicked w refb)
                         void $ return t # set UI.text "Game Over!!!"
                     _ -> if isWin newb then do
                             liftIO $ writeIORef refb (newb, Over)
-                            board2svg w refb (isClicked w refb)
+                            boardToSVG w refb (isClicked w refb)
                             void $ return t # set UI.text "Congratulations, You Win!!!"
                          else do
                             liftIO $ writeIORef refb (newb, st)
-                            board2svg w refb (isClicked w refb)
+                            boardToSVG w refb (isClicked w refb)
 
 
     -- Set window title
@@ -144,15 +144,15 @@ isClicked w refb xxyy _ = do
             ss1 <- s1 # UI.get UI.value
             ss2 <- s2 # UI.get UI.value
             ss3 <- s3 # UI.get UI.value
-            newb <- liftIO $ makeBoard (read ss1) (read ss2) (read ss3) [xxyy]
-            let (newb', _) = clickBoardAt xxyy newb
+            newb <- liftIO $ initBoard (read ss1) (read ss2) (read ss3) [xxyy]
+            let (newb', _) = sweepingMines xxyy newb
             liftIO $ writeIORef refb (newb', Sweep)
-            board2svg w refb (isClicked w refb)
+            boardToSVG w refb (isClicked w refb)
 
         Mark -> do
-            let (newb, _) = flagBoardAt xxyy bb
+            let (newb, _) = markingMines xxyy bb
             liftIO $ writeIORef refb (newb, Mark)
-            board2svg w refb (isClicked w refb)
+            boardToSVG w refb (isClicked w refb)
 
         Sweep -> do
             let (newb, verdict) = sweepOrFlag xxyy bb
@@ -160,8 +160,8 @@ isClicked w refb xxyy _ = do
                 GameOver -> getElementById w "text" >>= \case
                     Just t -> do
                         liftIO $ writeIORef refb (newb, Over)
-                        board2svg w refb (isClicked w refb)
-                        void $ element t # set UI.text "GameOver"
+                        boardToSVG w refb (isClicked w refb)
+                        void $ element t # set UI.text "Game Over!!!"
                     _ -> return ()
                 
                 _ -> do
@@ -169,18 +169,18 @@ isClicked w refb xxyy _ = do
                         getElementById w "text" >>= \case
                             Just t -> do
                                 liftIO $ writeIORef refb (newb, Over)
-                                board2svg w refb (isClicked w refb)
-                                void $ element t # set UI.text "Win"
+                                boardToSVG w refb (isClicked w refb)
+                                void $ element t # set UI.text "Congratulations, You Win!!!"
                             _ -> return ()
 
                     unless (isWin newb) $ do
                         liftIO $ writeIORef refb (newb, st)
-                        board2svg w refb (isClicked w refb)
+                        boardToSVG w refb (isClicked w refb)
 
         _ -> return ()
 
-board2svg :: Window -> IORef (Board, GameState) -> ((Int, Int) -> (Double, Double) -> UI ()) -> UI ()
-board2svg w refb event = do
+boardToSVG :: Window -> IORef (Board, GameState) -> ((Int, Int) -> (Double, Double) -> UI ()) -> UI ()
+boardToSVG w refb event = do
     (b, _st) <- liftIO $ readIORef refb
     let Board (dx, dy) boardCells = b
     getElementById w "container" >>= \case
