@@ -11,10 +11,6 @@ type Dimension = (Int, Int)
 type Point = (Int, Int)
 data Board = Board Dimension [[BoardCell]]  deriving (Show, Eq, Ord)
 
-idxboard :: Board -> [(Point, BoardCell)]
-idxboard (Board (dx, dy) b) = 
-    [ ((x, y), b !! x !! y)   | x <- [0..dx-1], y <- [0..dy-1] ]
-
 get :: Point -> Board -> Maybe BoardCell
 get (x, y) (Board _ a) = do
     row <- safeRow x a
@@ -32,35 +28,20 @@ put (x, y) z (Board (xx, yy) a) =
     where 
          c = [ [ if (tx, ty) == (x, y) then z else a !! tx !! ty  | 
                  ty <- [0..yy - 1] ] | tx <- [0..xx - 1] ]
-                 
- 
-isMine :: BoardCell -> Bool                 
-isMine (Cell Mine _) = True
-isMine _ = False
 
-isHidden :: BoardCell -> Bool                 
-isHidden (Cell _ Hidden) = True
-isHidden _ = False
-
-isFlag :: BoardCell -> Bool                 
-isFlag (Cell _ Flag) = True
-isFlag _ = False
-   
 countNeighbour :: Point -> Board -> Int
 countNeighbour (x, y) b = 
     length [ () | dx <- [-1..1], dy <- [-1..1], dx /= 0 || dy /= 0,
                   let z = get (x + dx, y + dy) b,
                   isJust z,
-                  isMine (fromJust z) ]
-                  
-emptyBoard :: Dimension -> Board
-emptyBoard (dx, dy) = 
-   Board (dx, dy) [  [ Cell (Space 0) Hidden | _ <- [0..dy - 1]] | _ <- [0..dx - 1] ]
-   
+                  case fromJust z of
+                      Cell Mine _ -> True
+                      _ -> False ]
+
 clickBoardAt :: Point -> Board -> (Board, Result)
 clickBoardAt (x, y) b = 
     case get (x, y) b of
-        Just (Cell Mine Hidden) -> (put (x, y) (Cell Mine Revealed) b, GameOver)
+        Just (Cell Mine Hidden) -> (revealAllMines b, GameOver)
         Just (Cell (Space _) Hidden) ->
             let v = countNeighbour (x, y) b
                 r = put (x, y) (Cell (Space v) Revealed) b
@@ -76,6 +57,13 @@ clickBoardAt (x, y) b =
                 (r, Continue)
         Just _ -> (b, Continue)
         _ -> (b, GameOver)
+
+revealAllMines :: Board -> Board
+revealAllMines (Board dim cells) =
+    Board dim (map (map revealMine) cells)
+    where
+        revealMine cell@(Cell Mine Hidden) = Cell Mine Revealed
+        revealMine cell = cell
         
 flagBoardAt (x, y) b = 
     case get (x, y) b of
@@ -94,42 +82,46 @@ isWin (Board _ b) =
         ok (Cell _ Revealed) = True
         ok _ = False
         
-getNeighbors :: Point -> Board -> [(Point, BoardCell)]
-getNeighbors (x, y) b = 
-    [ ((x + dx, y + dy), fromJust z) | dx <- [-1..1], dy <- [-1..1], dx /= 0 || dy /= 0,
-                  let z = get (x + dx, y + dy) b,
-                  isJust z ]
-
+processCells :: Board -> (Point -> [Maybe BoardCell] -> [Point] -> Maybe [Point]) -> [Point]
+processCells (Board (dx, dy) boardCells) processFunction = 
+    concatMap processCell [(x, y) | x <- [0..dx-1], y <- [0..dy-1]]
+    where
+        processCell p@(x, y) =
+            let nbCells = [ get (nx, ny) (Board (dx, dy) boardCells) 
+                            | nx <- [x-1..x+1], ny <- [y-1..y+1], (nx, ny) /= p ]
+                nbPoints = [ (nx, ny) 
+                             | nx <- [x-1..x+1], ny <- [y-1..y+1], (nx, ny) /= p ]
+            in maybe [] id (processFunction p nbCells nbPoints)
         
 obviousMines :: Board -> [Point]
-obviousMines b = 
-    [ r | (idx, _) <- idxboard b, r <- obviousMine idx b ]
+obviousMines board = processCells board obviousMine
     where
-        obviousMine (x, y) b = 
-            let nb = getNeighbors (x, y) b 
-                content = get (x, y) b 
-            in
-            case content of
+        obviousMine (x, y) nbCells nbPoints =
+            case get (x, y) board of
                 Just (Cell (Space n) Revealed) ->
-                    if length [ () | (_, x) <- nb, isHidden x || isFlag x ] == n then
-                        [ (x, y) | ((x, y), z) <- nb, isHidden z ] 
-                    else
-                        []
-                _ -> []
-    
+                    let hiddenOrFlagCount = length $ filter isHiddenOrFlag nbCells
+                    in if hiddenOrFlagCount == n 
+                        then Just [p | (p, Just (Cell _ Hidden)) <- zip nbPoints nbCells]
+                        else Nothing
+                _ -> Nothing
 
-obviousNonMines ::  Board -> [Point]
-obviousNonMines b = 
-    [ r | (idx, _) <- idxboard b, r <- obviousNonMine idx b ]
+        isHiddenOrFlag (Just (Cell _ Hidden)) = True
+        isHiddenOrFlag (Just (Cell _ Flag)) = True
+        isHiddenOrFlag _ = False
+
+obviousNonMines :: Board -> [Point]
+obviousNonMines board = processCells board obviousNonMine
     where
-        obviousNonMine (x, y) b = 
-            let nb = getNeighbors (x, y) b 
-                content = get (x, y) b 
-            in
-            case content of
+        obviousNonMine (x, y) nbCells nbPoints =
+            case get (x, y) board of
                 Just (Cell (Space n) Revealed) ->
-                    if length [ () | (_, x) <- nb, isFlag x ] == n then
-                        [ (x, y) | ((x, y), z) <- nb, isHidden z ] 
-                    else
-                        []
-                _ -> []
+                    let flagCount = length $ filter isFlag nbCells
+                    in if flagCount == n 
+                        then Just [p | (p, Just (Cell _ Hidden)) <- zip nbPoints nbCells]
+                        else Nothing
+                _ -> Nothing
+
+        isFlag (Just (Cell _ Flag)) = True
+        isFlag _ = False
+
+

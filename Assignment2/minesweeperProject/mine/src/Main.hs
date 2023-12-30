@@ -16,7 +16,7 @@ makeBoard dimx dimy count forbidden = do
     randomCells <- rnd
     return $ foldr placeMine initial randomCells
   where
-    initial = emptyBoard (dimx, dimy)
+    initial = Board (dimx, dimy) [  [ Cell (Space 0) Hidden | _ <- [0..dimy - 1]] | _ <- [0..dimx - 1] ]
     indices = [(x, y) | x <- [0..dimx - 1], y <- [0..dimy - 1], (x, y) `notElem` forbidden]
     rnd = sampleN count indices
     placeMine xy = put xy (Cell Mine Hidden)
@@ -182,7 +182,7 @@ isClicked w refb xxyy _ = do
 board2svg :: Window -> IORef (Board, GameState) -> ((Int, Int) -> (Double, Double) -> UI ()) -> UI ()
 board2svg w refb event = do
     (b, _st) <- liftIO $ readIORef refb
-    let Board (dx, dy) _ = b
+    let Board (dx, dy) boardCells = b
     getElementById w "container" >>= \case
         Just container -> do
             void $ element container # set html ""
@@ -190,7 +190,7 @@ board2svg w refb event = do
             let svgWidth = show (dy * 30)
             context <- SVG.svg # set SVG.height svgHeight # set SVG.width svgWidth
             void $ element container #+ [element context]
-            mapM_ (mineElement context event) (idxboard b)
+            mapM_ (\x -> mapM_ (\y -> mineElement context event ((x, y), (boardCells !! x !! y))) [0..dy-1]) [0..dx-1]
         Nothing -> return ()
     
 mineElement context e ((x, y), b) = do
